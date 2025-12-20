@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>La mia libreria</title>
+    <style>
+        /* --- VARIABILI & TEMA DARK --- */
+        :root {
+            --bg-body: #121212;
+            --bg-surface: #1E1E1E;
+            --bg-surface-hover: #252525;
+            --primary: #BB86FC;
+            --secondary: #03DAC6;
+            --text-main: #FFFFFF;
+            --text-muted: #A0A0A0;
+            --danger: #FF5252;
+            --radius: 12px;
+            --sidebar-width: 260px;
+        }
+
+        /* --- RESET & BASE --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- LAYOUT RESPONSIVE --- */
+        .app-wrapper { display: flex; height: 100%; width: 100%; flex-direction: column; }
+        .main-content { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 90px; scroll-behavior: smooth; }
+        .content-container { max-width: 1100px; margin: 0 auto; width: 100%; }
+
+        /* Scrollbar Desktop */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+        /* --- NAVIGAZIONE (Icons Updated) --- */
+        .nav-bar {
+            background-color: var(--bg-surface);
+            border-top: 1px solid #333;
+            display: flex; justify-content: space-around; align-items: center;
+            height: 65px; position: fixed; bottom: 0; width: 100%; z-index: 100;
+        }
+        .nav-item {
+            color: var(--text-muted); text-decoration: none; display: flex;
+            flex-direction: column; align-items: center; font-size: 0.7rem;
+            cursor: pointer; padding: 8px; border-radius: 12px; flex: 1; transition: all 0.2s ease;
+        }
+        
+        /* SVG ICON STYLING */
+        .nav-icon {
+            width: 24px; height: 24px; margin-bottom: 4px;
+            stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none;
+            transition: all 0.2s ease;
+        }
+
+        .nav-item.active { color: var(--text-main); }
+        .nav-item.active .nav-icon { color: var(--primary); transform: translateY(-2px); stroke-width: 2.5; }
+
+        @media (min-width: 850px) {
+            .app-wrapper { flex-direction: row; }
+            .nav-bar {
+                position: relative; width: var(--sidebar-width); height: 100%;
+                flex-direction: column; justify-content: flex-start;
+                border-top: none; border-right: 1px solid #333;
+                padding: 40px 15px;
+            }
+            .nav-item {
+                flex-direction: row; font-size: 1rem; width: 100%; padding: 15px 20px;
+                margin-bottom: 8px; flex: none; justify-content: flex-start; gap: 15px;
+            }
+            .nav-item:hover { background-color: rgba(255,255,255,0.05); color: white; }
+            .nav-item.active { background-color: rgba(187, 134, 252, 0.15); color: var(--primary); }
+            .nav-icon { margin-bottom: 0; transform: none !important; width: 22px; height: 22px; }
+            .main-content { padding-bottom: 20px; }
+        }
+
+        /* --- UI COMPONENTS --- */
+        h2 { margin-bottom: 20px; font-weight: 700; letter-spacing: -0.5px; }
+        
+        /* Input Fields */
+        input[type="text"], input[type="date"], input[type="number"] {
+            width: 100%; padding: 14px; background: var(--bg-surface);
+            border: 1px solid #333; color: white; border-radius: var(--radius);
+            font-size: 1rem; transition: border-color 0.2s;
+        }
+        input:focus { border-color: var(--primary); }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 50px;
+            cursor: pointer; font-weight: 600; font-size: 0.95rem;
+            transition: 0.2s; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background-color: var(--primary); color: #000; }
+        .btn-primary:hover { filter: brightness(1.1); box-shadow: 0 0 15px rgba(187,134,252,0.3); }
+        .btn-outline { background: transparent; border: 1px solid #555; color: var(--text-main); }
+        .btn-outline:hover { border-color: white; background: rgba(255,255,255,0.05); }
+
+        .header-actions { display: flex; gap: 10px; }
+        .icon-btn {
+            background: var(--bg-surface); border: 1px solid #333; color: var(--text-muted);
+            width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+            display: grid; place-items: center; font-size: 1.2rem; transition: 0.2s;
+        }
+        .icon-btn:hover { background: #333; color: white; border-color: #555; }
+
+        /* --- GRID SYSTEM --- */
+        .books-grid {
+            display: grid; gap: 15px;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        }
+        .books-grid.grid-mode {
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        }
+
+        /* --- GROUP HEADERS --- */
+        .group-header {
+            grid-column: 1 / -1; 
+            padding: 20px 5px 10px; font-size: 0.85rem; font-weight: 700;
+            letter-spacing: 1px; color: var(--primary); text-transform: uppercase;
+            border-bottom: 1px solid #333; margin-bottom: 5px;
+        }
+
+        /* --- CARD DESIGN --- */
+        .card {
+            background: var(--bg-surface); border-radius: var(--radius); padding: 12px;
+            display: flex; gap: 15px; border: 1px solid transparent; position: relative;
+            transition: transform 0.2s, background 0.2s; cursor: pointer;
+        }
+        .card:hover { background: var(--bg-surface-hover); border-color: #333; transform: translateY(-2px); }
+
+        .card-img {
+            width: 70px; height: 105px; object-fit: cover; border-radius: 8px;
+            background: #2a2a2a; box-shadow: 0 4px 8px rgba(0,0,0,0.3); flex-shrink: 0;
+        }
+        .card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+        .card-title { 
+            font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; 
+            color: var(--text-main); line-height: 1.3; white-space: normal;
+        }
+        .card-author { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px; }
+        .card-meta { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #777; margin-top: auto; }
+        
+        .badge { padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 0.65rem; text-transform: uppercase; }
+        .badge-paper { background: rgba(255, 255, 255, 0.1); color: #ddd; }
+        .badge-ebook { background: rgba(3, 218, 198, 0.15); color: var(--secondary); }
+
+        .btn-delete {
+            width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent;
+            color: #555; display: grid; place-items: center; cursor: pointer; transition: 0.2s;
+            margin-left: auto; flex-shrink: 0;
+        }
+        .btn-delete:hover { background: rgba(255, 82, 82, 0.15); color: var(--danger); }
+        .btn-delete svg { width: 18px; height: 18px; fill: currentColor; }
+
+        .grid-mode .card { flex-direction: column; padding: 10px; text-align: center; height: 100%; }
+        .grid-mode .card-img { width: 100%; height: auto; aspect-ratio: 2/3; margin-bottom: 8px; }
+        .grid-mode .card-body { justify-content: flex-start; width: 100%; }
+        .grid-mode .card-title { font-size: 0.9rem; }
+        .grid-mode .card-author { font-size: 0.8rem; }
+        .grid-mode .card-meta, .grid-mode .btn-delete { display: none; }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 200;
+            display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-box {
+            background: #181818; width: 90%; max-width: 480px; max-height: 90vh;
+            border-radius: 20px; padding: 25px; border: 1px solid #333;
+            overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+            transform: scale(0.95); transition: transform 0.2s;
+        }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+
+        .form-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; display: block; margin-top: 15px; }
+        .toggle-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .toggle-group input[type="radio"] { display: none; }
+        .toggle-btn {
+            flex: 1; padding: 12px; text-align: center; background: #222; border: 1px solid #333;
+            border-radius: 12px; cursor: pointer; transition: all 0.2s; color: #888; font-weight: 500;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .toggle-btn:hover { background: #2a2a2a; color: white; }
+        
+        input[value="WISH"]:checked + .toggle-btn { background: rgba(187, 134, 252, 0.15); border-color: var(--primary); color: var(--primary); }
+        input[value="READ"]:checked + .toggle-btn { background: rgba(3, 218, 198, 0.15); border-color: var(--secondary); color: var(--secondary); }
+        input[name="format"]:checked + .toggle-btn { background: rgba(255,255,255,0.1); border-color: white; color: white; }
+
+        /* --- TOAST --- */
+        #toast {
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: white; color: black; padding: 12px 24px; border-radius: 50px;
+            font-weight: 600; opacity: 0; pointer-events: none; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 300; box-shadow: 0 10px 30px rgba(0,0,0,0.3); font-size: 0.9rem;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @media (min-width: 850px) { #toast { bottom: 40px; left: calc(50% + 130px); } }
+
+        .hidden { display: none !important; }
+        .empty-state { text-align: center; color: var(--text-muted); padding: 40px 0; grid-column: 1/-1; }
+    </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+    
+    <nav class="nav-bar">
+        <div style="display: none; width: 100%; margin-bottom: 20px; font-weight: 800; font-size: 1.4rem; padding-left: 10px;" id="desktop-logo">
+            <span style="color:var(--primary)">La mia</span> libreria
+        </div>
+        
+        <a class="nav-item active" onclick="switchView('search', this)">
+            <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>Cerca</span>
+        </a>
+        
+        <a class="nav-item" onclick="switchView('wishlist', this)">
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            <span>Desideri</span>
+        </a>
+        
+        <a class="nav-item" onclick="switchView('read', this)">
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Letti</span>
+        </a>
+        
+        <div style="flex:1"></div>
+        
+        <a class="nav-item" onclick="switchView('settings', this)">
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span>Backup</span>
+        </a>
+    </nav>
+
+    <main class="main-content">
+        <div class="content-container">
+
+            <section id="view-search">
+                <h2>Cerca nuovi libri</h2>
+                <div style="display: flex; gap: 10px; margin-bottom: 25px;">
+                    <input type="text" id="search-input" placeholder="Digita titolo, autore o ISBN..." onkeydown="if(event.key==='Enter') searchOnline()">
+                    <button class="btn btn-primary" onclick="searchOnline()">Vai</button>
+                </div>
+                <div id="loading-spinner" class="hidden" style="text-align:center; padding:20px; color:var(--text-muted);">Ricerca in corso...</div>
+                <div id="search-results" class="books-grid">
+                    <div class="empty-state">Inizia a cercare per aggiungere libri.</div>
+                </div>
+            </section>
+
+            <section id="view-wishlist" class="hidden">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2>Desideri <span id="count-wish" style="font-size:0.6em; color:var(--text-muted); font-weight:400;">(0)</span></h2>
+                    <div class="header-actions">
+                        <button class="icon-btn" onclick="toggleSort()">⇅</button>
+                        <button class="icon-btn" onclick="toggleViewMode()">⊞</button>
+                    </div>
+                </div>
+                <input type="text" id="filter-wish" placeholder="Filtra..." style="margin-bottom:20px;" onkeyup="renderLists()">
+                <div id="list-wishlist" class="books-grid"></div>
+            </section>
+
+            <section id="view-read" class="hidden">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2>Letti <span id="count-read" style="font-size:0.6em; color:var(--text-muted); font-weight:400;">(0)</span></h2>
+                    <div class="header-actions">
+                        <button class="icon-btn" onclick="toggleSort()">⇅</button>
+                        <button class="icon-btn" onclick="toggleViewMode()">⊞</button>
+                    </div>
+                </div>
+                <input type="text" id="filter-read" placeholder="Filtra..." style="margin-bottom:20px;" onkeyup="renderLists()">
+                <div id="list-read" class="books-grid"></div>
+            </section>
+
+            <section id="view-settings" class="hidden">
+                <h2>Gestione Backup</h2>
+                <div style="background:var(--bg-surface); border-radius:16px; padding:30px; text-align:center; margin-top:20px; border:1px solid #333;">
+                    <div style="font-size:3rem; margin-bottom:15px;">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </div>
+                    <h3 style="margin-bottom:10px;">Esporta i tuoi dati</h3>
+                    <p style="color:var(--text-muted); margin-bottom:25px;">Scarica il CSV per salvare i tuoi libri.</p>
+                    <button class="btn btn-primary" onclick="exportCSV()" style="width:100%; max-width:300px; margin-bottom:15px;">Scarica File CSV</button>
+                    <br>
+                    <button class="btn btn-outline" onclick="document.getElementById('file-import').click()" style="width:100%; max-width:300px;">Ripristina da CSV</button>
+                    <input type="file" id="file-import" accept=".csv" class="hidden" onchange="importCSV(this)">
+                </div>
+            </section>
+
+        </div>
+    </main>
+</div>
+
+<div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal-box">
+        <h3 style="margin-bottom:20px;">Dettagli Libro</h3>
+        <input type="hidden" id="edit-id">
+
+        <label class="form-label">Titolo</label>
+        <input type="text" id="edit-title">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+            <div><label class="form-label">Autore</label><input type="text" id="edit-author"></div>
+            <div><label class="form-label">Editore</label><input type="text" id="edit-publisher"></div>
+        </div>
+
+        <label class="form-label">Stato Lettura</label>
+        <div class="toggle-group">
+            <input type="radio" id="s-wish" name="status" value="WISH">
+            <label for="s-wish" class="toggle-btn">🔖 Desideri</label>
+            <input type="radio" id="s-read" name="status" value="READ">
+            <label for="s-read" class="toggle-btn">✅ Letto</label>
+        </div>
+
+        <label class="form-label">Formato</label>
+        <div class="toggle-group">
+            <input type="radio" id="f-paper" name="format" value="PAPER">
+            <label for="f-paper" class="toggle-btn">📖 Cartaceo</label>
+            <input type="radio" id="f-ebook" name="format" value="EBOOK">
+            <label for="f-ebook" class="toggle-btn">📱 Ebook</label>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+            <div><label class="form-label">Pagine</label><input type="number" id="edit-pages"></div>
+            <div><label class="form-label">Data Aggiunta</label><input type="date" id="edit-date"></div>
+        </div>
+
+        <label class="form-label">URL Copertina</label>
+        <input type="text" id="edit-cover">
+
+        <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+            <button class="btn btn-primary" onclick="saveBookFromModal()">Salva Libro</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast">Notifica</div>
+
+<script>
+    // --- STATE ---
+    let myBooks = JSON.parse(localStorage.getItem('myLib_v5')) || [];
+    let isGridView = false;
+    let isSortDesc = true;
+    let currentView = 'search';
+    let tempSearchData = []; 
+
+    if(window.innerWidth > 850) document.getElementById('desktop-logo').style.display = 'block';
+
+    function switchView(viewId, navEl) {
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        if(navEl) navEl.classList.add('active');
+        document.querySelectorAll('section').forEach(el => el.classList.add('hidden'));
+        document.getElementById('view-' + viewId).classList.remove('hidden');
+        currentView = viewId;
+        if(viewId === 'read' || viewId === 'wishlist') renderLists();
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // --- LIST RENDERING ---
+    function toggleViewMode() {
+        isGridView = !isGridView;
+        document.getElementById('list-wishlist').className = isGridView ? 'books-grid grid-mode' : 'books-grid';
+        document.getElementById('list-read').className = isGridView ? 'books-grid grid-mode' : 'books-grid';
+        renderLists();
+    }
+    function toggleSort() { isSortDesc = !isSortDesc; renderLists(); }
+
+    function renderLists() {
+        const targetStatus = currentView === 'read' ? 'READ' : 'WISH';
+        const container = document.getElementById(currentView === 'read' ? 'list-read' : 'list-wishlist');
+        const filterTxt = document.getElementById(currentView === 'read' ? 'filter-read' : 'filter-wish').value.toLowerCase();
+        
+        container.innerHTML = '';
+
+        let filtered = myBooks.filter(b => b.status === targetStatus);
+        document.getElementById(targetStatus === 'READ' ? 'count-read' : 'count-wish').textContent = `(${filtered.length})`;
+
+        if(filterTxt) filtered = filtered.filter(b => b.title.toLowerCase().includes(filterTxt) || b.author.toLowerCase().includes(filterTxt));
+        
+        filtered.sort((a, b) => isSortDesc ? b.addedDate - a.addedDate : a.addedDate - b.addedDate);
+
+        if(filtered.length === 0) {
+            container.innerHTML = `<div class="empty-state">Nessun libro trovato.</div>`;
+            return;
+        }
+
+        const months = ["GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO", "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"];
+        let lastGroup = "";
+
+        filtered.forEach(book => {
+            const d = new Date(book.addedDate);
+            const groupKey = `${months[d.getMonth()]} ${d.getFullYear()}`;
+
+            if(groupKey !== lastGroup) {
+                const header = document.createElement('div');
+                header.className = 'group-header';
+                header.textContent = groupKey;
+                container.appendChild(header);
+                lastGroup = groupKey;
+            }
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.onclick = (e) => { if(!e.target.closest('button')) openEditModal(book.id); };
+
+            const formatBadge = book.format === 'EBOOK' 
+                ? `<span class="badge badge-ebook">Ebook</span>` 
+                : `<span class="badge badge-paper">Cartaceo</span>`;
+
+            const trashIcon = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+
+            card.innerHTML = `
+                <img src="${book.coverUrl || 'https://via.placeholder.com/100x150?text=Libro'}" class="card-img" alt="cover">
+                <div class="card-body">
+                    <div class="card-title">${book.title}</div>
+                    <div class="card-author">${book.author}</div>
+                    <div class="card-meta">
+                        ${formatBadge}
+                        <button class="btn-delete" title="Elimina" onclick="deleteBook('${book.id}', event)">${trashIcon}</button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // --- SEARCH ONLINE ---
+    async function searchOnline() {
+        const query = document.getElementById('search-input').value;
+        if(query.length < 2) return;
+        
+        document.getElementById('loading-spinner').classList.remove('hidden');
+        const resContainer = document.getElementById('search-results');
+        resContainer.innerHTML = '';
+        tempSearchData = []; 
+
+        try {
+            const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=12`);
+            const data = await res.json();
+            document.getElementById('loading-spinner').classList.add('hidden');
+
+            if(!data.items) {
+                resContainer.innerHTML = '<div class="empty-state">Nessun risultato trovato.</div>';
+                return;
+            }
+
+            tempSearchData = data.items.map(item => ({
+                id: item.id,
+                title: item.volumeInfo.title || "Senza Titolo",
+                author: item.volumeInfo.authors ? item.volumeInfo.authors[0] : "Sconosciuto",
+                publisher: item.volumeInfo.publisher || "",
+                coverUrl: item.volumeInfo.imageLinks ? item.volumeInfo.imageLinks.thumbnail.replace('http:', 'https:') : '',
+                pageCount: item.volumeInfo.pageCount || 0
+            }));
+
+            tempSearchData.forEach((book, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.alignItems = 'center';
+                card.innerHTML = `
+                    <img src="${book.coverUrl || 'https://via.placeholder.com/100x150'}" class="card-img">
+                    <div class="card-body">
+                        <div class="card-title">${book.title}</div>
+                        <div class="card-author">${book.author}</div>
+                    </div>
+                    <button class="btn btn-primary" style="padding:8px 16px; border-radius:20px; font-size:0.8rem;" onclick="prepareModalFromSearch(${index})">Salva</button>
+                `;
+                resContainer.appendChild(card);
+            });
+
+        } catch(e) {
+            console.error(e);
+            alert("Errore di connessione API.");
+            document.getElementById('loading-spinner').classList.add('hidden');
+        }
+    }
+
+    // --- MODAL & DATA ---
+    function prepareModalFromSearch(index) {
+        const data = tempSearchData[index];
+        document.getElementById('edit-id').value = Date.now();
+        document.getElementById('edit-title').value = data.title;
+        document.getElementById('edit-author').value = data.author;
+        document.getElementById('edit-publisher').value = data.publisher;
+        document.getElementById('edit-cover').value = data.coverUrl;
+        document.getElementById('edit-pages').value = data.pageCount;
+        document.getElementById('edit-date').valueAsDate = new Date();
+        document.getElementById('s-wish').checked = true;
+        document.getElementById('f-paper').checked = true;
+        openModal();
+    }
+
+    function openEditModal(id) {
+        const book = myBooks.find(b => b.id === id);
+        if(!book) return;
+        document.getElementById('edit-id').value = book.id;
+        document.getElementById('edit-title').value = book.title;
+        document.getElementById('edit-author').value = book.author;
+        document.getElementById('edit-publisher').value = book.publisher;
+        document.getElementById('edit-cover').value = book.coverUrl;
+        document.getElementById('edit-pages').value = book.pageCount;
+        document.getElementById('edit-date').valueAsDate = new Date(book.addedDate);
+        document.querySelector(`input[name="status"][value="${book.status}"]`).checked = true;
+        document.querySelector(`input[name="format"][value="${book.format}"]`).checked = true;
+        openModal();
+    }
+
+    function openModal() {
+        document.getElementById('modal-overlay').classList.add('active');
+        setTimeout(() => document.getElementById('edit-title').focus(), 100);
+    }
+    function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
+
+    function saveBookFromModal() {
+        const id = document.getElementById('edit-id').value;
+        const title = document.getElementById('edit-title').value;
+        if(!title) return alert("Inserisci almeno il titolo");
+
+        const newBook = {
+            id: id,
+            title: title,
+            author: document.getElementById('edit-author').value,
+            publisher: document.getElementById('edit-publisher').value,
+            coverUrl: document.getElementById('edit-cover').value,
+            pageCount: parseInt(document.getElementById('edit-pages').value) || 0,
+            addedDate: document.getElementById('edit-date').valueAsNumber || Date.now(),
+            status: document.querySelector('input[name="status"]:checked').value,
+            format: document.querySelector('input[name="format"]:checked').value
+        };
+
+        const existingIdx = myBooks.findIndex(b => b.id === id);
+        if(existingIdx > -1) myBooks[existingIdx] = newBook;
+        else myBooks.push(newBook);
+
+        localStorage.setItem('myLib_v5', JSON.stringify(myBooks));
+        closeModal();
+
+        if(currentView === 'search') {
+            showToast("Aggiunto ai " + (newBook.status === 'WISH' ? 'Desideri' : 'Letti'));
+        } else {
+            renderLists();
+            showToast("Modifiche salvate");
+        }
+    }
+
+    function deleteBook(id, e) {
+        if(e) e.stopPropagation();
+        if(confirm("Eliminare questo libro?")) {
+            myBooks = myBooks.filter(b => b.id !== id);
+            localStorage.setItem('myLib_v5', JSON.stringify(myBooks));
+            renderLists();
+            showToast("Libro eliminato");
+        }
+    }
+
+    function exportCSV() {
+        const header = "id,title,author,publisher,status,format,date,pages,coverUrl\n";
+        const rows = myBooks.map(b => {
+             const c = (t) => `"${(t||"").toString().replace(/"/g, '""')}"`;
+             return `${c(b.id)},${c(b.title)},${c(b.author)},${c(b.publisher)},${b.status},${b.format},${new Date(b.addedDate).toISOString().slice(0,10)},${b.pageCount},${c(b.coverUrl)}`;
+        }).join("\n");
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([header+rows], {type:'text/csv'}));
+        a.download = `Libreria_Backup_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+    }
+    
+    function importCSV(input) {
+        const file = input.files[0];
+        if(!file) return;
+        const r = new FileReader();
+        r.onload = e => {
+            const lines = e.target.result.split('\n');
+            let count = 0;
+            for(let i=1; i<lines.length; i++) {
+                if(!lines[i].trim()) continue;
+                const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+                if(cols.length >= 6) {
+                    const b = {
+                        id: cols[0] || Date.now() + Math.random(),
+                        title: cols[1], author: cols[2], publisher: cols[3],
+                        status: cols[4] === 'READ' ? 'READ':'WISH',
+                        format: cols[5] === 'EBOOK' ? 'EBOOK':'PAPER',
+                        addedDate: new Date(cols[6]).getTime() || Date.now(),
+                        pageCount: parseInt(cols[7])||0, coverUrl: cols[8]||""
+                    };
+                    if(!myBooks.find(x => x.id === b.id)) { myBooks.push(b); count++; }
+                }
+            }
+            localStorage.setItem('myLib_v5', JSON.stringify(myBooks));
+            showToast(`Importati ${count} libri`);
+            input.value = '';
+        };
+        r.readAsText(file);
+    }
+</script>
+</body>
+</html>
