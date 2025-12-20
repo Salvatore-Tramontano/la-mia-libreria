@@ -13,6 +13,6 @@ L'obiettivo è fornire uno strumento immediato e portabile per tracciare i libri
 - Persistenza Locale: Utilizza il LocalStorage del browser per salvare i dati istantaneamente senza necessità di login o account.
 
 ## Limiti tecnici
-Archiviazione Locale: I dati risiedono esclusivamente nella cache del browser. Se la cache viene svuotata, i dati vengono persi (a meno che non sia stato effettuato un backup CSV).
-Nessuna Sincronizzazione Cloud: Non essendoci un database centrale, i dati non si sincronizzano automaticamente tra diversi dispositivi. Il trasferimento deve avvenire manualmente tramite file CSV.
-Dipendenza API: La ricerca di nuovi libri richiede una connessione internet attiva per interrogare i server di Google Books.
+- Archiviazione Locale: I dati risiedono esclusivamente nella cache del browser. Se la cache viene svuotata, i dati vengono persi (a meno che non sia stato effettuato un backup CSV).
+- Nessuna Sincronizzazione Cloud: Non essendoci un database centrale, i dati non si sincronizzano automaticamente tra diversi dispositivi. Il trasferimento deve avvenire manualmente tramite file CSV.
+- Dipendenza API: La ricerca di nuovi libri richiede una connessione internet attiva per interrogare i server di Google Books.
