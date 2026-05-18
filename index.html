@@ -153,6 +153,7 @@
         .badge { padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 0.65rem; text-transform: uppercase; }
         .badge-paper { background: rgba(255, 255, 255, 0.1); color: #ddd; }
         .badge-ebook { background: rgba(3, 218, 198, 0.15); color: var(--secondary); }
+        .badge-library { background: rgba(187, 134, 252, 0.15); color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; white-space: nowrap; }
 
         .btn-delete {
             width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent;
@@ -250,7 +251,7 @@
             <section id="view-search">
                 <h2>Cerca nuovi libri</h2>
                 <div style="display: flex; gap: 10px; margin-bottom: 25px;">
-                    <input type="text" id="search-input" placeholder="Digita titolo, autore o ISBN..." onkeydown="if(event.key==='Enter') searchOnline()">
+                    <input type="text" id="search-input" placeholder="Digita titolo, autore o ISBN..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter'){ clearTimeout(searchDebounceTimer); searchOnline(); }">
                     <button class="btn btn-primary" onclick="searchOnline()">Vai</button>
                 </div>
                 <div id="loading-spinner" class="hidden" style="text-align:center; padding:20px; color:var(--text-muted);">Ricerca in corso...</div>
@@ -442,55 +443,179 @@
         });
     }
 
-    // --- SEARCH ONLINE ---
-    async function searchOnline() {
-        const query = document.getElementById('search-input').value;
-        if(query.length < 2) return;
-        
-        document.getElementById('loading-spinner').classList.remove('hidden');
-        const resContainer = document.getElementById('search-results');
-        resContainer.innerHTML = '';
-        tempSearchData = []; 
+    // --- SEARCH ENGINE ---
+    let searchDebounceTimer = null;
 
+    function normStr(s) {
+        return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function isAlreadyInLibrary(book) {
+        return myBooks.some(b =>
+            normStr(b.title) === normStr(book.title) &&
+            normStr(b.author) === normStr(book.author)
+        );
+    }
+
+    function dedup(googleResults, olResults) {
+        const googleTitles = new Set(googleResults.map(b => normStr(b.title)));
+        return [...googleResults, ...olResults.filter(b => !googleTitles.has(normStr(b.title)))];
+    }
+
+    function getCachedSearch(query) {
         try {
-            const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=12`);
+            const cache = JSON.parse(sessionStorage.getItem('searchCache') || '{}');
+            return cache[normStr(query)] || null;
+        } catch(e) { return null; }
+    }
+
+    function setCachedSearch(query, results) {
+        try {
+            const cache = JSON.parse(sessionStorage.getItem('searchCache') || '{}');
+            cache[normStr(query)] = results;
+            sessionStorage.setItem('searchCache', JSON.stringify(cache));
+        } catch(e) {}
+    }
+
+    async function fetchWithTimeout(url, ms = 7000) {
+        const ctrl = new AbortController();
+        const id = setTimeout(() => ctrl.abort(), ms);
+        try {
+            const res = await fetch(url, { signal: ctrl.signal });
+            clearTimeout(id);
+            return res;
+        } catch(e) {
+            clearTimeout(id);
+            throw e;
+        }
+    }
+
+    async function searchGoogleBooks(query) {
+        try {
+            const res = await fetchWithTimeout(
+                `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=15`
+            );
+            if (!res.ok) return null;
             const data = await res.json();
-            document.getElementById('loading-spinner').classList.add('hidden');
-
-            if(!data.items) {
-                resContainer.innerHTML = '<div class="empty-state">Nessun risultato trovato.</div>';
-                return;
-            }
-
-            tempSearchData = data.items.map(item => ({
-                id: item.id,
+            if (!data.items || data.items.length === 0) return null;
+            return data.items.map(item => ({
+                id: 'gb_' + item.id,
                 title: item.volumeInfo.title || "Senza Titolo",
                 author: item.volumeInfo.authors ? item.volumeInfo.authors[0] : "Sconosciuto",
                 publisher: item.volumeInfo.publisher || "",
                 coverUrl: item.volumeInfo.imageLinks ? item.volumeInfo.imageLinks.thumbnail.replace('http:', 'https:') : '',
-                pageCount: item.volumeInfo.pageCount || 0
+                pageCount: item.volumeInfo.pageCount || 0,
+                year: item.volumeInfo.publishedDate ? item.volumeInfo.publishedDate.slice(0, 4) : ''
             }));
-
-            tempSearchData.forEach((book, index) => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.style.alignItems = 'center';
-                card.innerHTML = `
-                    <img src="${book.coverUrl || 'https://via.placeholder.com/100x150'}" class="card-img">
-                    <div class="card-body">
-                        <div class="card-title">${book.title}</div>
-                        <div class="card-author">${book.author}</div>
-                    </div>
-                    <button class="btn btn-primary" style="padding:8px 16px; border-radius:20px; font-size:0.8rem;" onclick="prepareModalFromSearch(${index})">Salva</button>
-                `;
-                resContainer.appendChild(card);
-            });
-
         } catch(e) {
-            console.error(e);
-            alert("Errore di connessione API.");
-            document.getElementById('loading-spinner').classList.add('hidden');
+            return null;
         }
+    }
+
+    async function searchOpenLibrary(query) {
+        try {
+            const res = await fetchWithTimeout(
+                `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=15&fields=key,title,author_name,publisher,cover_i,number_of_pages_median,first_publish_year`
+            );
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (!data.docs || data.docs.length === 0) return null;
+            return data.docs.map(doc => ({
+                id: 'ol_' + (doc.key || Math.random()).toString().replace(/\//g, '_'),
+                title: doc.title || "Senza Titolo",
+                author: doc.author_name ? doc.author_name[0] : "Sconosciuto",
+                publisher: doc.publisher ? doc.publisher[0] : "",
+                coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '',
+                pageCount: doc.number_of_pages_median || 0,
+                year: doc.first_publish_year ? String(doc.first_publish_year) : ''
+            }));
+        } catch(e) {
+            return null;
+        }
+    }
+
+    function renderSearchCards(results) {
+        const resContainer = document.getElementById('search-results');
+        resContainer.innerHTML = '';
+        results.forEach((book, index) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.alignItems = 'center';
+            const fallbackImg = `this.onerror=null;this.src='https://placehold.co/70x105/2a2a2a/555?text=📖'`;
+            const alreadyAdded = isAlreadyInLibrary(book);
+            const yearStr = book.year ? `<span style="color:#777; font-size:0.8rem; margin-top:4px; display:block;">${book.year}</span>` : '';
+            const actionBtn = alreadyAdded
+                ? `<span class="badge badge-library">Già aggiunto</span>`
+                : `<button class="btn btn-primary" style="padding:8px 16px; border-radius:20px; font-size:0.8rem; flex-shrink:0;" onclick="prepareModalFromSearch(${index})">Salva</button>`;
+            card.innerHTML = `
+                <img src="${book.coverUrl || 'https://placehold.co/70x105/2a2a2a/555?text=📖'}" class="card-img" onerror="${fallbackImg}">
+                <div class="card-body">
+                    <div class="card-title">${book.title}</div>
+                    <div class="card-author">${book.author}</div>
+                    ${yearStr}
+                </div>
+                ${actionBtn}
+            `;
+            if (alreadyAdded) card.style.opacity = '0.55';
+            resContainer.appendChild(card);
+        });
+    }
+
+    function onSearchInput() {
+        clearTimeout(searchDebounceTimer);
+        const query = document.getElementById('search-input').value.trim();
+        if (query.length < 2) return;
+        searchDebounceTimer = setTimeout(() => searchOnline(), 500);
+    }
+
+    async function searchOnline() {
+        clearTimeout(searchDebounceTimer);
+        const query = document.getElementById('search-input').value.trim();
+        if (query.length < 2) return;
+
+        const spinner = document.getElementById('loading-spinner');
+        const resContainer = document.getElementById('search-results');
+
+        const cached = getCachedSearch(query);
+        if (cached) {
+            tempSearchData = cached;
+            renderSearchCards(cached);
+            return;
+        }
+
+        spinner.textContent = 'Ricerca in corso...';
+        spinner.classList.remove('hidden');
+        resContainer.innerHTML = '';
+        tempSearchData = [];
+
+        const [googleRes, olRes] = await Promise.allSettled([
+            searchGoogleBooks(query),
+            searchOpenLibrary(query)
+        ]);
+
+        const googleResults = googleRes.status === 'fulfilled' ? googleRes.value : null;
+        const olResults    = olRes.status === 'fulfilled'    ? olRes.value    : null;
+
+        spinner.classList.add('hidden');
+        spinner.textContent = 'Ricerca in corso...';
+
+        let results = [];
+        if (googleResults && olResults) results = dedup(googleResults, olResults);
+        else if (googleResults)         results = googleResults;
+        else if (olResults)             results = olResults;
+
+        if (results.length === 0) {
+            resContainer.innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1;">
+                    <div style="margin-bottom:12px; color:var(--text-muted);">Nessun risultato trovato.</div>
+                    <button class="btn btn-outline" onclick="searchOnline()">Riprova</button>
+                </div>`;
+            return;
+        }
+
+        setCachedSearch(query, results);
+        tempSearchData = results;
+        renderSearchCards(results);
     }
 
     // --- MODAL & DATA ---
