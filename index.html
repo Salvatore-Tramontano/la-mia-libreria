@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>La mia libreria</title>
     <style>
         /* --- VARIABILI & TEMA DARK --- */
@@ -116,10 +116,12 @@
         /* --- GRID SYSTEM --- */
         .books-grid {
             display: grid; gap: 15px;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            /* min(100%, 300px) evita che una colonna più larga dello schermo
+               provochi overflow orizzontale sui telefoni stretti */
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
         }
         .books-grid.grid-mode {
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 130px), 1fr));
         }
 
         /* --- GROUP HEADERS --- */
@@ -351,11 +353,40 @@
 
 <script>
     // --- STATE ---
-    let myBooks = JSON.parse(localStorage.getItem('myLib_v5')) || [];
+    // Caricamento resiliente: uno storage bloccato (modalità privata) o dati
+    // corrotti non devono mandare in errore l'intero script.
+    let myBooks = [];
+    try { myBooks = JSON.parse(localStorage.getItem('myLib_v5')) || []; }
+    catch(e) { myBooks = []; }
+
     let isGridView = false;
     let isSortDesc = true;
     let currentView = 'search';
-    let tempSearchData = []; 
+    let tempSearchData = [];
+
+    // Copertina segnaposto locale (data URI): niente dipendenze da servizi esterni.
+    const COVER_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="70" height="105">'
+        + '<rect width="70" height="105" fill="#2a2a2a"/>'
+        + '<g fill="none" stroke="#5a5a5a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M18 30h26a4 4 0 0 1 4 4v40H22a4 4 0 0 1-4-4z"/><path d="M18 30v40"/></g></svg>'
+    );
+
+    // Escape dei valori dinamici inseriti come HTML (titoli con < " & ecc.).
+    function esc(s) {
+        return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+    }
+
+    // Sostituisce una copertina non caricabile con il segnaposto locale.
+    function imgFallback(el) { el.onerror = null; el.src = COVER_PLACEHOLDER; }
+
+    // Salvataggio resiliente su localStorage.
+    function saveBooks() {
+        try { localStorage.setItem('myLib_v5', JSON.stringify(myBooks)); }
+        catch(e) { showToast('Impossibile salvare: spazio non disponibile'); }
+    }
 
     if(window.innerWidth > 850) document.getElementById('desktop-logo').style.display = 'block';
 
@@ -394,7 +425,7 @@
         let filtered = myBooks.filter(b => b.status === targetStatus);
         document.getElementById(targetStatus === 'READ' ? 'count-read' : 'count-wish').textContent = `(${filtered.length})`;
 
-        if(filterTxt) filtered = filtered.filter(b => b.title.toLowerCase().includes(filterTxt) || b.author.toLowerCase().includes(filterTxt));
+        if(filterTxt) filtered = filtered.filter(b => (b.title||'').toLowerCase().includes(filterTxt) || (b.author||'').toLowerCase().includes(filterTxt));
         
         filtered.sort((a, b) => isSortDesc ? b.addedDate - a.addedDate : a.addedDate - b.addedDate);
 
@@ -429,13 +460,13 @@
             const trashIcon = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
 
             card.innerHTML = `
-                <img src="${book.coverUrl || 'https://via.placeholder.com/100x150?text=Libro'}" class="card-img" alt="cover">
+                <img src="${esc(book.coverUrl) || COVER_PLACEHOLDER}" class="card-img" alt="cover" onerror="imgFallback(this)">
                 <div class="card-body">
-                    <div class="card-title">${book.title}</div>
-                    <div class="card-author">${book.author}</div>
+                    <div class="card-title">${esc(book.title)}</div>
+                    <div class="card-author">${esc(book.author)}</div>
                     <div class="card-meta">
                         ${formatBadge}
-                        <button class="btn-delete" title="Elimina" onclick="deleteBook('${book.id}', event)">${trashIcon}</button>
+                        <button class="btn-delete" title="Elimina" onclick="deleteBook('${esc(book.id)}', event)">${trashIcon}</button>
                     </div>
                 </div>
             `;
@@ -445,6 +476,7 @@
 
     // --- SEARCH ENGINE ---
     let searchDebounceTimer = null;
+    let searchToken = 0; // identifica l'ultima ricerca: scarta risposte obsolete
 
     function normStr(s) {
         return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
@@ -477,7 +509,7 @@
         } catch(e) {}
     }
 
-    async function fetchWithTimeout(url, ms = 7000) {
+    async function fetchWithTimeout(url, ms = 10000) { // 10s: margine per reti mobili lente
         const ctrl = new AbortController();
         const id = setTimeout(() => ctrl.abort(), ms);
         try {
@@ -490,48 +522,50 @@
         }
     }
 
+    // Nota: queste funzioni LANCIANO un'eccezione in caso di errore di rete,
+    // timeout o risposta HTTP non valida (es. 429 "Too Many Requests" di Google,
+    // frequente su rete mobile dove molti utenti condividono lo stesso IP).
+    // Restituiscono invece [] quando la fonte risponde ma non ha risultati.
+    // Così searchOnline() distingue "connessione fallita" da "nessun risultato".
     async function searchGoogleBooks(query) {
-        try {
-            const res = await fetchWithTimeout(
-                `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=15`
-            );
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (!data.items || data.items.length === 0) return null;
-            return data.items.map(item => ({
+        const res = await fetchWithTimeout(
+            `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=15`
+        );
+        if (!res.ok) throw new Error('Google Books HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.items || data.items.length === 0) return [];
+        return data.items.map(item => {
+            const info = item.volumeInfo || {};
+            const links = info.imageLinks || {};
+            const cover = links.thumbnail || links.smallThumbnail || '';
+            return {
                 id: 'gb_' + item.id,
-                title: item.volumeInfo.title || "Senza Titolo",
-                author: item.volumeInfo.authors ? item.volumeInfo.authors[0] : "Sconosciuto",
-                publisher: item.volumeInfo.publisher || "",
-                coverUrl: item.volumeInfo.imageLinks ? item.volumeInfo.imageLinks.thumbnail.replace('http:', 'https:') : '',
-                pageCount: item.volumeInfo.pageCount || 0,
-                year: item.volumeInfo.publishedDate ? item.volumeInfo.publishedDate.slice(0, 4) : ''
-            }));
-        } catch(e) {
-            return null;
-        }
+                title: info.title || "Senza Titolo",
+                author: info.authors ? info.authors[0] : "Sconosciuto",
+                publisher: info.publisher || "",
+                coverUrl: cover ? cover.replace('http:', 'https:') : '',
+                pageCount: info.pageCount || 0,
+                year: info.publishedDate ? info.publishedDate.slice(0, 4) : ''
+            };
+        });
     }
 
     async function searchOpenLibrary(query) {
-        try {
-            const res = await fetchWithTimeout(
-                `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=15&fields=key,title,author_name,publisher,cover_i,number_of_pages_median,first_publish_year`
-            );
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (!data.docs || data.docs.length === 0) return null;
-            return data.docs.map(doc => ({
-                id: 'ol_' + (doc.key || Math.random()).toString().replace(/\//g, '_'),
-                title: doc.title || "Senza Titolo",
-                author: doc.author_name ? doc.author_name[0] : "Sconosciuto",
-                publisher: doc.publisher ? doc.publisher[0] : "",
-                coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '',
-                pageCount: doc.number_of_pages_median || 0,
-                year: doc.first_publish_year ? String(doc.first_publish_year) : ''
-            }));
-        } catch(e) {
-            return null;
-        }
+        const res = await fetchWithTimeout(
+            `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=15&fields=key,title,author_name,publisher,cover_i,number_of_pages_median,first_publish_year`
+        );
+        if (!res.ok) throw new Error('Open Library HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.docs || data.docs.length === 0) return [];
+        return data.docs.map(doc => ({
+            id: 'ol_' + (doc.key || Math.random()).toString().replace(/\//g, '_'),
+            title: doc.title || "Senza Titolo",
+            author: doc.author_name ? doc.author_name[0] : "Sconosciuto",
+            publisher: doc.publisher ? doc.publisher[0] : "",
+            coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '',
+            pageCount: doc.number_of_pages_median || 0,
+            year: doc.first_publish_year ? String(doc.first_publish_year) : ''
+        }));
     }
 
     function renderSearchCards(results) {
@@ -541,17 +575,16 @@
             const card = document.createElement('div');
             card.className = 'card';
             card.style.alignItems = 'center';
-            const fallbackImg = `this.onerror=null;this.src='https://placehold.co/70x105/2a2a2a/555?text=📖'`;
             const alreadyAdded = isAlreadyInLibrary(book);
-            const yearStr = book.year ? `<span style="color:#777; font-size:0.8rem; margin-top:4px; display:block;">${book.year}</span>` : '';
+            const yearStr = book.year ? `<span style="color:#777; font-size:0.8rem; margin-top:4px; display:block;">${esc(book.year)}</span>` : '';
             const actionBtn = alreadyAdded
                 ? `<span class="badge badge-library">Già aggiunto</span>`
                 : `<button class="btn btn-primary" style="padding:8px 16px; border-radius:20px; font-size:0.8rem; flex-shrink:0;" onclick="prepareModalFromSearch(${index})">Salva</button>`;
             card.innerHTML = `
-                <img src="${book.coverUrl || 'https://placehold.co/70x105/2a2a2a/555?text=📖'}" class="card-img" onerror="${fallbackImg}">
+                <img src="${esc(book.coverUrl) || COVER_PLACEHOLDER}" class="card-img" onerror="imgFallback(this)">
                 <div class="card-body">
-                    <div class="card-title">${book.title}</div>
-                    <div class="card-author">${book.author}</div>
+                    <div class="card-title">${esc(book.title)}</div>
+                    <div class="card-author">${esc(book.author)}</div>
                     ${yearStr}
                 </div>
                 ${actionBtn}
@@ -575,9 +608,11 @@
 
         const spinner = document.getElementById('loading-spinner');
         const resContainer = document.getElementById('search-results');
+        const token = ++searchToken; // segna questa come la ricerca corrente
 
         const cached = getCachedSearch(query);
         if (cached) {
+            spinner.classList.add('hidden');
             tempSearchData = cached;
             renderSearchCards(cached);
             return;
@@ -593,16 +628,30 @@
             searchOpenLibrary(query)
         ]);
 
-        const googleResults = googleRes.status === 'fulfilled' ? googleRes.value : null;
-        const olResults    = olRes.status === 'fulfilled'    ? olRes.value    : null;
+        // Se nel frattempo è partita una ricerca più recente, ignora questa risposta.
+        if (token !== searchToken) return;
 
         spinner.classList.add('hidden');
-        spinner.textContent = 'Ricerca in corso...';
 
-        let results = [];
-        if (googleResults && olResults) results = dedup(googleResults, olResults);
-        else if (googleResults)         results = googleResults;
-        else if (olResults)             results = olResults;
+        const googleOk = googleRes.status === 'fulfilled';
+        const olOk     = olRes.status === 'fulfilled';
+        const googleResults = googleOk ? googleRes.value : [];
+        const olResults     = olOk     ? olRes.value     : [];
+
+        // Entrambe le fonti irraggiungibili: rete assente, timeout o rate-limit.
+        // Messaggio esplicito invece di far sembrare che non ci siano risultati.
+        if (!googleOk && !olOk) {
+            resContainer.innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1;">
+                    <div style="margin-bottom:12px; color:var(--text-muted);">⚠️ Impossibile contattare i servizi di ricerca.<br>Controlla la connessione e riprova.</div>
+                    <button class="btn btn-outline" onclick="searchOnline()">Riprova</button>
+                </div>`;
+            return;
+        }
+
+        const results = (googleOk && olOk)
+            ? dedup(googleResults, olResults)
+            : googleResults.concat(olResults);
 
         if (results.length === 0) {
             resContainer.innerHTML = `
@@ -675,7 +724,7 @@
         if(existingIdx > -1) myBooks[existingIdx] = newBook;
         else myBooks.push(newBook);
 
-        localStorage.setItem('myLib_v5', JSON.stringify(myBooks));
+        saveBooks();
         closeModal();
 
         if(currentView === 'search') {
@@ -690,7 +739,7 @@
         if(e) e.stopPropagation();
         if(confirm("Eliminare questo libro?")) {
             myBooks = myBooks.filter(b => b.id !== id);
-            localStorage.setItem('myLib_v5', JSON.stringify(myBooks));
+            saveBooks();
             renderLists();
             showToast("Libro eliminato");
         }
@@ -730,7 +779,7 @@
                     if(!myBooks.find(x => x.id === b.id)) { myBooks.push(b); count++; }
                 }
             }
-            localStorage.setItem('myLib_v5', JSON.stringify(myBooks));
+            saveBooks();
             showToast(`Importati ${count} libri`);
             input.value = '';
         };
