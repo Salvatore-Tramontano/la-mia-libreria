@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>La mia libreria</title>
+    <meta name="theme-color" content="#121212">
+    <meta name="description" content="Gestisci la tua libreria personale: libri letti e desideri, ricerca online, backup CSV.">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <style>
         /* --- VARIABILI & TEMA DARK --- */
         :root {
@@ -21,6 +26,8 @@
 
         /* --- RESET & BASE --- */
         * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
+        /* outline:none sopra toglie l'indicatore nativo: lo ripristiniamo solo per navigazione da tastiera */
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-body);
@@ -52,6 +59,7 @@
             color: var(--text-muted); text-decoration: none; display: flex;
             flex-direction: column; align-items: center; font-size: 0.7rem;
             cursor: pointer; padding: 8px; border-radius: 12px; flex: 1; transition: all 0.2s ease;
+            background: none; border: none; font-family: inherit;
         }
         
         /* SVG ICON STYLING */
@@ -112,6 +120,10 @@
             display: grid; place-items: center; font-size: 1.2rem; transition: 0.2s;
         }
         .icon-btn:hover { background: #333; color: white; border-color: #555; }
+        select.icon-btn {
+            width: auto; padding: 0 10px; font-size: 0.8rem; font-family: inherit;
+            appearance: none; -webkit-appearance: none; -moz-appearance: none;
+        }
 
         /* --- GRID SYSTEM --- */
         .books-grid {
@@ -156,6 +168,7 @@
         .badge-paper { background: rgba(255, 255, 255, 0.1); color: #ddd; }
         .badge-ebook { background: rgba(3, 218, 198, 0.15); color: var(--secondary); }
         .badge-library { background: rgba(187, 134, 252, 0.15); color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; white-space: nowrap; }
+        .card-rating { color: #FFD54A; font-size: 0.8rem; letter-spacing: 1px; }
 
         .btn-delete {
             width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent;
@@ -201,18 +214,70 @@
         input[value="READ"]:checked + .toggle-btn { background: rgba(3, 218, 198, 0.15); border-color: var(--secondary); color: var(--secondary); }
         input[name="format"]:checked + .toggle-btn { background: rgba(255,255,255,0.1); border-color: white; color: white; }
 
+        /* --- RATING STARS --- */
+        .rating-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .rating-group { display: flex; flex-direction: row-reverse; justify-content: flex-end; gap: 4px; }
+        .rating-group input { display: none; }
+        .rating-group label {
+            font-size: 1.8rem; line-height: 1; color: #3a3a3a; cursor: pointer; transition: color 0.15s;
+        }
+        .rating-group input:checked ~ label { color: #FFD54A; }
+        .rating-group label:hover, .rating-group label:hover ~ label { color: #FFD54A; }
+        .rating-clear {
+            background: none; border: none; color: var(--text-muted); font-size: 0.8rem;
+            cursor: pointer; text-decoration: underline;
+        }
+        .rating-clear:hover { color: white; }
+
+        textarea {
+            width: 100%; padding: 14px; background: var(--bg-surface);
+            border: 1px solid #333; color: white; border-radius: var(--radius);
+            font-size: 1rem; font-family: inherit; resize: vertical; min-height: 80px;
+            transition: border-color 0.2s;
+        }
+        textarea:focus { border-color: var(--primary); }
+
         /* --- TOAST --- */
         #toast {
             position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
             background: white; color: black; padding: 12px 24px; border-radius: 50px;
             font-weight: 600; opacity: 0; pointer-events: none; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 300; box-shadow: 0 10px 30px rgba(0,0,0,0.3); font-size: 0.9rem;
+            display: flex; align-items: center; gap: 14px; white-space: nowrap;
         }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+        .toast-action {
+            background: none; border: none; color: var(--primary); font-weight: 800;
+            font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+            cursor: pointer; padding: 0;
+        }
         @media (min-width: 850px) { #toast { bottom: 40px; left: calc(50% + 130px); } }
 
         .hidden { display: none !important; }
         .empty-state { text-align: center; color: var(--text-muted); padding: 40px 0; grid-column: 1/-1; }
+
+        /* --- STATISTICHE --- */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 10px; }
+        .stat-tile { background: var(--bg-surface); border: 1px solid #333; border-radius: var(--radius); padding: 20px; text-align: center; }
+        .stat-value { font-size: 1.9rem; font-weight: 800; color: var(--primary); line-height: 1; margin-bottom: 6px; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .stats-section-title { font-size: 0.95rem; font-weight: 700; margin: 30px 0 15px; }
+
+        .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; padding: 10px 0; }
+        .bar-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+        .bar-chart-bar { width: 100%; max-width: 28px; background: var(--primary); border-radius: 4px 4px 0 0; min-height: 3px; }
+        .bar-chart-label { font-size: 0.65rem; color: var(--text-muted); margin-top: 6px; }
+
+        .top-authors-list { list-style: none; background: var(--bg-surface); border: 1px solid #333; border-radius: var(--radius); overflow: hidden; }
+        .top-authors-list li { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #262626; font-size: 0.9rem; }
+        .top-authors-list li:last-child { border-bottom: none; }
+        .top-authors-list li span:last-child { color: var(--text-muted); }
+
+        .format-split { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #2a2a2a; }
+        .format-split-paper { background: #ddd; }
+        .format-split-ebook { background: var(--secondary); }
+        .format-split-legend { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -224,27 +289,32 @@
             <span style="color:var(--primary)">La mia</span> libreria
         </div>
         
-        <a class="nav-item active" onclick="switchView('search', this)">
+        <button type="button" class="nav-item active" onclick="switchView('search', this)">
             <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <span>Cerca</span>
-        </a>
-        
-        <a class="nav-item" onclick="switchView('wishlist', this)">
+        </button>
+
+        <button type="button" class="nav-item" onclick="switchView('wishlist', this)">
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
             <span>Desideri</span>
-        </a>
-        
-        <a class="nav-item" onclick="switchView('read', this)">
+        </button>
+
+        <button type="button" class="nav-item" onclick="switchView('read', this)">
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             <span>Letti</span>
-        </a>
-        
+        </button>
+
+        <button type="button" class="nav-item" onclick="switchView('stats', this)">
+            <svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <span>Statistiche</span>
+        </button>
+
         <div style="flex:1"></div>
-        
-        <a class="nav-item" onclick="switchView('settings', this)">
+
+        <button type="button" class="nav-item" onclick="switchView('settings', this)">
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
             <span>Backup</span>
-        </a>
+        </button>
     </nav>
 
     <main class="main-content">
@@ -252,13 +322,16 @@
 
             <section id="view-search">
                 <h2>Cerca nuovi libri</h2>
-                <div style="display: flex; gap: 10px; margin-bottom: 25px;">
-                    <input type="text" id="search-input" placeholder="Digita titolo, autore o ISBN..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter'){ clearTimeout(searchDebounceTimer); searchOnline(); }">
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <input type="text" id="search-input" placeholder="Digita titolo, autore o ISBN..." aria-label="Cerca libri online" oninput="onSearchInput()" onkeydown="if(event.key==='Enter'){ clearTimeout(searchDebounceTimer); searchOnline(); }">
                     <button class="btn btn-primary" onclick="searchOnline()">Vai</button>
+                </div>
+                <div style="margin-bottom: 25px;">
+                    <button class="btn btn-outline" style="width:100%;" onclick="openManualAddModal()">+ Aggiungi libro manualmente</button>
                 </div>
                 <div id="loading-spinner" class="hidden" style="text-align:center; padding:20px; color:var(--text-muted);">Ricerca in corso...</div>
                 <div id="search-results" class="books-grid">
-                    <div class="empty-state">Inizia a cercare per aggiungere libri.</div>
+                    <div class="empty-state">Inizia a cercare per aggiungere libri, oppure inseriscine uno a mano.</div>
                 </div>
             </section>
 
@@ -266,11 +339,17 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h2>Desideri <span id="count-wish" style="font-size:0.6em; color:var(--text-muted); font-weight:400;">(0)</span></h2>
                     <div class="header-actions">
-                        <button class="icon-btn" onclick="toggleSort()">⇅</button>
-                        <button class="icon-btn" onclick="toggleViewMode()">⊞</button>
+                        <button class="icon-btn" title="Aggiungi manualmente" aria-label="Aggiungi manualmente ai desideri" onclick="openManualAddModal('WISH')">+</button>
+                        <select id="sort-field-wish" class="icon-btn" aria-label="Ordina per" onchange="setSortField(this.value)">
+                            <option value="date">Data</option>
+                            <option value="title">Titolo</option>
+                            <option value="author">Autore</option>
+                        </select>
+                        <button id="sort-dir-wish" class="icon-btn" title="Ordine decrescente" aria-label="Ordine decrescente" onclick="toggleSort()">↓</button>
+                        <button class="icon-btn" title="Cambia visualizzazione" aria-label="Cambia visualizzazione griglia o lista" onclick="toggleViewMode()">⊞</button>
                     </div>
                 </div>
-                <input type="text" id="filter-wish" placeholder="Filtra..." style="margin-bottom:20px;" onkeyup="renderLists()">
+                <input type="text" id="filter-wish" placeholder="Filtra..." aria-label="Filtra desideri" style="margin-bottom:20px;" onkeyup="renderLists()">
                 <div id="list-wishlist" class="books-grid"></div>
             </section>
 
@@ -278,12 +357,23 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h2>Letti <span id="count-read" style="font-size:0.6em; color:var(--text-muted); font-weight:400;">(0)</span></h2>
                     <div class="header-actions">
-                        <button class="icon-btn" onclick="toggleSort()">⇅</button>
-                        <button class="icon-btn" onclick="toggleViewMode()">⊞</button>
+                        <button class="icon-btn" title="Aggiungi manualmente" aria-label="Aggiungi manualmente ai letti" onclick="openManualAddModal('READ')">+</button>
+                        <select id="sort-field-read" class="icon-btn" aria-label="Ordina per" onchange="setSortField(this.value)">
+                            <option value="date">Data</option>
+                            <option value="title">Titolo</option>
+                            <option value="author">Autore</option>
+                        </select>
+                        <button id="sort-dir-read" class="icon-btn" title="Ordine decrescente" aria-label="Ordine decrescente" onclick="toggleSort()">↓</button>
+                        <button class="icon-btn" title="Cambia visualizzazione" aria-label="Cambia visualizzazione griglia o lista" onclick="toggleViewMode()">⊞</button>
                     </div>
                 </div>
-                <input type="text" id="filter-read" placeholder="Filtra..." style="margin-bottom:20px;" onkeyup="renderLists()">
+                <input type="text" id="filter-read" placeholder="Filtra..." aria-label="Filtra letti" style="margin-bottom:20px;" onkeyup="renderLists()">
                 <div id="list-read" class="books-grid"></div>
+            </section>
+
+            <section id="view-stats" class="hidden">
+                <h2>Statistiche</h2>
+                <div id="stats-content"></div>
             </section>
 
             <section id="view-settings" class="hidden">
@@ -306,8 +396,8 @@
 </div>
 
 <div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this) closeModal()">
-    <div class="modal-box">
-        <h3 style="margin-bottom:20px;">Dettagli Libro</h3>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h3 id="modal-title" style="margin-bottom:20px;">Dettagli Libro</h3>
         <input type="hidden" id="edit-id">
 
         <label class="form-label">Titolo</label>
@@ -342,6 +432,21 @@
         <label class="form-label">URL Copertina</label>
         <input type="text" id="edit-cover">
 
+        <label class="form-label">Valutazione (facoltativa)</label>
+        <div class="rating-row">
+            <div class="rating-group" role="radiogroup" aria-label="Valutazione in stelle">
+                <input type="radio" id="rate-5" name="rating" value="5"><label for="rate-5" aria-label="5 stelle">★</label>
+                <input type="radio" id="rate-4" name="rating" value="4"><label for="rate-4" aria-label="4 stelle">★</label>
+                <input type="radio" id="rate-3" name="rating" value="3"><label for="rate-3" aria-label="3 stelle">★</label>
+                <input type="radio" id="rate-2" name="rating" value="2"><label for="rate-2" aria-label="2 stelle">★</label>
+                <input type="radio" id="rate-1" name="rating" value="1"><label for="rate-1" aria-label="1 stella">★</label>
+            </div>
+            <button type="button" class="rating-clear" onclick="clearRating()">Cancella</button>
+        </div>
+
+        <label class="form-label">Note personali</label>
+        <textarea id="edit-notes" placeholder="Le tue impressioni, citazioni preferite..." aria-label="Note personali"></textarea>
+
         <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:10px;">
             <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
             <button class="btn btn-primary" onclick="saveBookFromModal()">Salva Libro</button>
@@ -361,8 +466,10 @@
 
     let isGridView = false;
     let isSortDesc = true;
+    let sortField = 'date'; // 'date' | 'title' | 'author'
     let currentView = 'search';
     let tempSearchData = [];
+    let lastFocusedEl = null; // per ridare il focus dopo la chiusura del modal
 
     // Copertina segnaposto locale (data URI): niente dipendenze da servizi esterni.
     const COVER_PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
@@ -397,13 +504,27 @@
         document.getElementById('view-' + viewId).classList.remove('hidden');
         currentView = viewId;
         if(viewId === 'read' || viewId === 'wishlist') renderLists();
+        if(viewId === 'stats') renderStats();
     }
 
-    function showToast(msg) {
+    let toastHideTimer = null;
+
+    // action opzionale: { label, onClick } per un pulsante inline (es. "Annulla").
+    function showToast(msg, action) {
         const t = document.getElementById('toast');
-        t.textContent = msg;
+        clearTimeout(toastHideTimer);
+        t.innerHTML = '';
+        t.appendChild(document.createTextNode(msg));
+        if(action) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'toast-action';
+            btn.textContent = action.label;
+            btn.onclick = () => { t.classList.remove('show'); action.onClick(); };
+            t.appendChild(btn);
+        }
         t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3000);
+        toastHideTimer = setTimeout(() => t.classList.remove('show'), action ? 5000 : 3000);
     }
 
     // --- LIST RENDERING ---
@@ -413,49 +534,85 @@
         document.getElementById('list-read').className = isGridView ? 'books-grid grid-mode' : 'books-grid';
         renderLists();
     }
-    function toggleSort() { isSortDesc = !isSortDesc; renderLists(); }
+    function updateSortDirUI() {
+        const label = isSortDesc ? 'Ordine decrescente' : 'Ordine crescente';
+        const icon = isSortDesc ? '↓' : '↑';
+        ['sort-dir-wish', 'sort-dir-read'].forEach(id => {
+            const btn = document.getElementById(id);
+            if(!btn) return;
+            btn.textContent = icon;
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+        });
+    }
+    function toggleSort() { isSortDesc = !isSortDesc; updateSortDirUI(); renderLists(); }
+
+    function setSortField(field) {
+        sortField = field;
+        const wishSel = document.getElementById('sort-field-wish');
+        const readSel = document.getElementById('sort-field-read');
+        if(wishSel) wishSel.value = field;
+        if(readSel) readSel.value = field;
+        renderLists();
+    }
+
+    function compareBooks(a, b) {
+        let cmp;
+        if(sortField === 'title') cmp = (a.title||'').localeCompare(b.title||'', 'it', { sensitivity: 'base' });
+        else if(sortField === 'author') cmp = (a.author||'').localeCompare(b.author||'', 'it', { sensitivity: 'base' });
+        else cmp = a.addedDate - b.addedDate;
+        return isSortDesc ? -cmp : cmp;
+    }
 
     function renderLists() {
         const targetStatus = currentView === 'read' ? 'READ' : 'WISH';
         const container = document.getElementById(currentView === 'read' ? 'list-read' : 'list-wishlist');
         const filterTxt = document.getElementById(currentView === 'read' ? 'filter-read' : 'filter-wish').value.toLowerCase();
-        
+
         container.innerHTML = '';
 
         let filtered = myBooks.filter(b => b.status === targetStatus);
         document.getElementById(targetStatus === 'READ' ? 'count-read' : 'count-wish').textContent = `(${filtered.length})`;
 
         if(filterTxt) filtered = filtered.filter(b => (b.title||'').toLowerCase().includes(filterTxt) || (b.author||'').toLowerCase().includes(filterTxt));
-        
-        filtered.sort((a, b) => isSortDesc ? b.addedDate - a.addedDate : a.addedDate - b.addedDate);
+
+        filtered.sort(compareBooks);
 
         if(filtered.length === 0) {
             container.innerHTML = `<div class="empty-state">Nessun libro trovato.</div>`;
             return;
         }
 
+        // I raggruppamenti per mese hanno senso solo quando l'ordine è per data:
+        // ordinando per titolo/autore la lista resta piatta.
         const months = ["GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO", "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"];
         let lastGroup = "";
 
         filtered.forEach(book => {
-            const d = new Date(book.addedDate);
-            const groupKey = `${months[d.getMonth()]} ${d.getFullYear()}`;
-
-            if(groupKey !== lastGroup) {
-                const header = document.createElement('div');
-                header.className = 'group-header';
-                header.textContent = groupKey;
-                container.appendChild(header);
-                lastGroup = groupKey;
+            if(sortField === 'date') {
+                const d = new Date(book.addedDate);
+                const groupKey = `${months[d.getMonth()]} ${d.getFullYear()}`;
+                if(groupKey !== lastGroup) {
+                    const header = document.createElement('div');
+                    header.className = 'group-header';
+                    header.textContent = groupKey;
+                    container.appendChild(header);
+                    lastGroup = groupKey;
+                }
             }
 
             const card = document.createElement('div');
             card.className = 'card';
             card.onclick = (e) => { if(!e.target.closest('button')) openEditModal(book.id); };
+            if(book.notes) card.title = book.notes;
 
-            const formatBadge = book.format === 'EBOOK' 
-                ? `<span class="badge badge-ebook">Ebook</span>` 
+            const formatBadge = book.format === 'EBOOK'
+                ? `<span class="badge badge-ebook">Ebook</span>`
                 : `<span class="badge badge-paper">Cartaceo</span>`;
+
+            const ratingBadge = book.rating > 0
+                ? `<span class="card-rating" title="Valutazione: ${book.rating}/5">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</span>`
+                : '';
 
             const trashIcon = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
 
@@ -466,12 +623,98 @@
                     <div class="card-author">${esc(book.author)}</div>
                     <div class="card-meta">
                         ${formatBadge}
-                        <button class="btn-delete" title="Elimina" onclick="deleteBook('${esc(book.id)}', event)">${trashIcon}</button>
+                        ${ratingBadge}
+                        <button class="btn-delete" title="Elimina" aria-label="Elimina libro" onclick="deleteBook('${esc(book.id)}', event)">${trashIcon}</button>
                     </div>
                 </div>
             `;
             container.appendChild(card);
         });
+    }
+
+    // --- STATISTICHE ---
+    function renderStats() {
+        const container = document.getElementById('stats-content');
+        const readBooks = myBooks.filter(b => b.status === 'READ');
+        const wishBooks = myBooks.filter(b => b.status === 'WISH');
+
+        if(myBooks.length === 0) {
+            container.innerHTML = `<div class="empty-state">Aggiungi qualche libro per vedere le statistiche.</div>`;
+            return;
+        }
+
+        const totalPages = readBooks.reduce((s, b) => s + (b.pageCount || 0), 0);
+        const avgPages = readBooks.length ? Math.round(totalPages / readBooks.length) : 0;
+        const ratedBooks = readBooks.filter(b => b.rating > 0);
+        const avgRating = ratedBooks.length ? ratedBooks.reduce((s, b) => s + b.rating, 0) / ratedBooks.length : 0;
+
+        const now = new Date();
+        const readThisYear = readBooks.filter(b => new Date(b.addedDate).getFullYear() === now.getFullYear()).length;
+
+        // Andamento negli ultimi 6 mesi, basato sulla data di aggiunta del libro (unico riferimento temporale disponibile).
+        const monthsShort = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+        const monthBuckets = [];
+        for(let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            monthBuckets.push({ year: d.getFullYear(), month: d.getMonth(), label: monthsShort[d.getMonth()], count: 0 });
+        }
+        readBooks.forEach(b => {
+            const d = new Date(b.addedDate);
+            const bucket = monthBuckets.find(m => m.year === d.getFullYear() && m.month === d.getMonth());
+            if(bucket) bucket.count++;
+        });
+        const maxCount = Math.max(1, ...monthBuckets.map(m => m.count));
+
+        const authorCounts = {};
+        readBooks.forEach(b => {
+            const a = (b.author || '').trim();
+            if(!a) return;
+            authorCounts[a] = (authorCounts[a] || 0) + 1;
+        });
+        const topAuthors = Object.entries(authorCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+        const ebookCount = readBooks.filter(b => b.format === 'EBOOK').length;
+        const ebookPct = readBooks.length ? Math.round(ebookCount / readBooks.length * 100) : 0;
+        const paperPct = 100 - ebookPct;
+
+        container.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-tile"><div class="stat-value">${readBooks.length}</div><div class="stat-label">Libri letti</div></div>
+                <div class="stat-tile"><div class="stat-value">${wishBooks.length}</div><div class="stat-label">Nei desideri</div></div>
+                <div class="stat-tile"><div class="stat-value">${totalPages.toLocaleString('it-IT')}</div><div class="stat-label">Pagine lette</div></div>
+                <div class="stat-tile"><div class="stat-value">${avgPages}</div><div class="stat-label">Media pagine/libro</div></div>
+                <div class="stat-tile"><div class="stat-value">${readThisYear}</div><div class="stat-label">Letti nel ${now.getFullYear()}</div></div>
+                <div class="stat-tile"><div class="stat-value">${avgRating ? avgRating.toFixed(1) : '—'}</div><div class="stat-label">Valutazione media</div></div>
+            </div>
+
+            <div class="stats-section-title">Ultimi 6 mesi</div>
+            ${readBooks.length ? `
+            <div class="bar-chart">
+                ${monthBuckets.map(m => `
+                    <div class="bar-chart-col">
+                        <div class="bar-chart-bar" style="height:${Math.max(4, m.count / maxCount * 100)}%" title="${m.count} libri letti"></div>
+                        <div class="bar-chart-label">${esc(m.label)}</div>
+                    </div>
+                `).join('')}
+            </div>` : `<div class="empty-state">Nessun libro letto ancora.</div>`}
+
+            <div class="stats-section-title">Autori più letti</div>
+            ${topAuthors.length ? `
+            <ul class="top-authors-list">
+                ${topAuthors.map(([name, count]) => `<li><span>${esc(name)}</span><span>${count} ${count === 1 ? 'libro' : 'libri'}</span></li>`).join('')}
+            </ul>` : `<div class="empty-state">Nessun libro letto ancora.</div>`}
+
+            ${readBooks.length ? `
+            <div class="stats-section-title">Formato</div>
+            <div class="format-split">
+                <div class="format-split-paper" style="width:${paperPct}%"></div>
+                <div class="format-split-ebook" style="width:${ebookPct}%"></div>
+            </div>
+            <div class="format-split-legend">
+                <span>📖 Cartaceo ${paperPct}%</span>
+                <span>📱 Ebook ${ebookPct}%</span>
+            </div>` : ''}
+        `;
     }
 
     // --- SEARCH ENGINE ---
@@ -643,8 +886,9 @@
         if (!googleOk && !olOk) {
             resContainer.innerHTML = `
                 <div class="empty-state" style="grid-column:1/-1;">
-                    <div style="margin-bottom:12px; color:var(--text-muted);">⚠️ Impossibile contattare i servizi di ricerca.<br>Controlla la connessione e riprova.</div>
+                    <div style="margin-bottom:12px; color:var(--text-muted);">⚠️ Impossibile contattare i servizi di ricerca.<br>Controlla la connessione e riprova, oppure aggiungi il libro a mano.</div>
                     <button class="btn btn-outline" onclick="searchOnline()">Riprova</button>
+                    <button class="btn btn-primary" style="margin-left:10px;" onclick="openManualAddModal()">+ Aggiungi manualmente</button>
                 </div>`;
             return;
         }
@@ -658,6 +902,7 @@
                 <div class="empty-state" style="grid-column:1/-1;">
                     <div style="margin-bottom:12px; color:var(--text-muted);">Nessun risultato trovato.</div>
                     <button class="btn btn-outline" onclick="searchOnline()">Riprova</button>
+                    <button class="btn btn-primary" style="margin-left:10px;" onclick="openManualAddModal()">+ Aggiungi manualmente</button>
                 </div>`;
             return;
         }
@@ -668,6 +913,13 @@
     }
 
     // --- MODAL & DATA ---
+    function setRatingUI(rating) {
+        document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = (parseInt(r.value) === rating));
+    }
+    function clearRating() {
+        document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
+    }
+
     function prepareModalFromSearch(index) {
         const data = tempSearchData[index];
         document.getElementById('edit-id').value = Date.now();
@@ -679,6 +931,23 @@
         document.getElementById('edit-date').valueAsDate = new Date();
         document.getElementById('s-wish').checked = true;
         document.getElementById('f-paper').checked = true;
+        clearRating();
+        document.getElementById('edit-notes').value = '';
+        openModal();
+    }
+
+    function openManualAddModal(defaultStatus) {
+        document.getElementById('edit-id').value = Date.now();
+        document.getElementById('edit-title').value = '';
+        document.getElementById('edit-author').value = '';
+        document.getElementById('edit-publisher').value = '';
+        document.getElementById('edit-cover').value = '';
+        document.getElementById('edit-pages').value = '';
+        document.getElementById('edit-date').valueAsDate = new Date();
+        document.getElementById(defaultStatus === 'READ' ? 's-read' : 's-wish').checked = true;
+        document.getElementById('f-paper').checked = true;
+        clearRating();
+        document.getElementById('edit-notes').value = '';
         openModal();
     }
 
@@ -694,19 +963,42 @@
         document.getElementById('edit-date').valueAsDate = new Date(book.addedDate);
         document.querySelector(`input[name="status"][value="${book.status}"]`).checked = true;
         document.querySelector(`input[name="format"][value="${book.format}"]`).checked = true;
+        setRatingUI(book.rating || 0);
+        document.getElementById('edit-notes').value = book.notes || '';
         openModal();
     }
 
     function openModal() {
+        lastFocusedEl = document.activeElement;
         document.getElementById('modal-overlay').classList.add('active');
+        document.addEventListener('keydown', handleModalKeydown);
         setTimeout(() => document.getElementById('edit-title').focus(), 100);
     }
-    function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
+    function closeModal() {
+        document.getElementById('modal-overlay').classList.remove('active');
+        document.removeEventListener('keydown', handleModalKeydown);
+        if(lastFocusedEl && typeof lastFocusedEl.focus === 'function') lastFocusedEl.focus();
+    }
+
+    // Chiude con Esc e intrappola il focus (Tab/Shift+Tab) dentro il modal finché è aperto.
+    function handleModalKeydown(e) {
+        if(e.key === 'Escape') { closeModal(); return; }
+        if(e.key !== 'Tab') return;
+        const modal = document.querySelector('.modal-box');
+        const focusable = modal.querySelectorAll('input:not([type="hidden"]):not(:disabled), textarea, button, select, [tabindex]:not([tabindex="-1"])');
+        if(focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if(e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
 
     function saveBookFromModal() {
         const id = document.getElementById('edit-id').value;
         const title = document.getElementById('edit-title').value;
         if(!title) return alert("Inserisci almeno il titolo");
+
+        const ratingChecked = document.querySelector('input[name="rating"]:checked');
 
         const newBook = {
             id: id,
@@ -717,7 +1009,9 @@
             pageCount: parseInt(document.getElementById('edit-pages').value) || 0,
             addedDate: document.getElementById('edit-date').valueAsNumber || Date.now(),
             status: document.querySelector('input[name="status"]:checked').value,
-            format: document.querySelector('input[name="format"]:checked').value
+            format: document.querySelector('input[name="format"]:checked').value,
+            rating: ratingChecked ? parseInt(ratingChecked.value) : 0,
+            notes: document.getElementById('edit-notes').value
         };
 
         const existingIdx = myBooks.findIndex(b => b.id === id);
@@ -737,19 +1031,28 @@
 
     function deleteBook(id, e) {
         if(e) e.stopPropagation();
-        if(confirm("Eliminare questo libro?")) {
-            myBooks = myBooks.filter(b => b.id !== id);
-            saveBooks();
-            renderLists();
-            showToast("Libro eliminato");
-        }
+        const idx = myBooks.findIndex(b => b.id === id);
+        if(idx === -1) return;
+        const [removed] = myBooks.splice(idx, 1);
+        saveBooks();
+        renderLists();
+        showToast("Libro eliminato", {
+            label: "Annulla",
+            onClick: () => {
+                myBooks.push(removed);
+                saveBooks();
+                renderLists();
+            }
+        });
     }
 
     function exportCSV() {
-        const header = "id,title,author,publisher,status,format,date,pages,coverUrl\n";
+        const header = "id,title,author,publisher,status,format,date,pages,coverUrl,rating,notes\n";
         const rows = myBooks.map(b => {
              const c = (t) => `"${(t||"").toString().replace(/"/g, '""')}"`;
-             return `${c(b.id)},${c(b.title)},${c(b.author)},${c(b.publisher)},${b.status},${b.format},${new Date(b.addedDate).toISOString().slice(0,10)},${b.pageCount},${c(b.coverUrl)}`;
+             // Le note possono contenere newline: li escapiamo per non spezzare il parsing per riga in importCSV.
+             const notesFlat = (b.notes || "").replace(/\r?\n/g, '\\n');
+             return `${c(b.id)},${c(b.title)},${c(b.author)},${c(b.publisher)},${b.status},${b.format},${new Date(b.addedDate).toISOString().slice(0,10)},${b.pageCount},${c(b.coverUrl)},${b.rating||0},${c(notesFlat)}`;
         }).join("\n");
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([header+rows], {type:'text/csv'}));
@@ -763,7 +1066,7 @@
         const r = new FileReader();
         r.onload = e => {
             const lines = e.target.result.split('\n');
-            let count = 0;
+            let count = 0, skipped = 0;
             for(let i=1; i<lines.length; i++) {
                 if(!lines[i].trim()) continue;
                 const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
@@ -774,16 +1077,31 @@
                         status: cols[4] === 'READ' ? 'READ':'WISH',
                         format: cols[5] === 'EBOOK' ? 'EBOOK':'PAPER',
                         addedDate: new Date(cols[6]).getTime() || Date.now(),
-                        pageCount: parseInt(cols[7])||0, coverUrl: cols[8]||""
+                        pageCount: parseInt(cols[7])||0, coverUrl: cols[8]||"",
+                        rating: parseInt(cols[9])||0,
+                        notes: (cols[10]||"").replace(/\\n/g, '\n')
                     };
-                    if(!myBooks.find(x => x.id === b.id)) { myBooks.push(b); count++; }
+                    // Duplicato per id (stesso export) o per titolo+autore (es. già inserito a mano
+                    // con un id diverso prima di importare un backup): in entrambi i casi si salta.
+                    const isDup = myBooks.some(x => x.id === b.id) || isAlreadyInLibrary(b);
+                    if(!isDup) { myBooks.push(b); count++; }
+                    else skipped++;
                 }
             }
             saveBooks();
-            showToast(`Importati ${count} libri`);
+            showToast(skipped > 0 ? `Importati ${count} libri (${skipped} già presenti)` : `Importati ${count} libri`);
             input.value = '';
         };
         r.readAsText(file);
+    }
+
+    // Registrazione facoltativa del service worker: se il file è aperto in locale
+    // (file://) o service-worker.js non è presente (es. copia del solo index.html),
+    // fallisce in silenzio senza intaccare il funzionamento dell'app.
+    if('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        });
     }
 </script>
 </body>
