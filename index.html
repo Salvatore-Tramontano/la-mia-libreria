@@ -505,6 +505,9 @@
         currentView = viewId;
         if(viewId === 'read' || viewId === 'wishlist') renderLists();
         if(viewId === 'stats') renderStats();
+        // Le sezioni condividono lo stesso .main-content scrollabile: senza reset,
+        // cambiando tab si eredita lo scroll lasciato nella vista precedente.
+        document.querySelector('.main-content').scrollTop = 0;
     }
 
     let toastHideTimer = null;
